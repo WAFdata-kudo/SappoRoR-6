@@ -1,0 +1,140 @@
+---
+title: "SappoRoR6"
+author: "WAFdata_kudo"
+date: "2016年7月8日"
+output: md_document
+---
+
+```{r echo=FALSE,include=FALSE}
+library(maptools)
+library(leaflet)
+library(rgdal)
+library(magrittr)
+library(dplyr)
+#install.packages("orloca")
+library(orloca)
+#install.packages("webshot")
+#shape.file<-"C:/Users/kudo/Desktop/DataAnalysis/02_blog/A002005212010DDSJC01101/h22ka01101"
+library(webshot)
+#install.packages("htmlwidgets")
+library(htmlwidgets)
+shape.file<-"C:/Users/kudo/Desktop/DataAnalysis/02_blog/A002005212010DDSJC01101/h22ka01101"
+
+```
+
+```{r}
+
+getinfo.shape(shape.file)
+
+pj<-CRS("+proj=longlat +datum=WGS84")
+Chuo<- readShapePoly(shape.file,proj4string = pj)
+
+
+pj<-CRS("+init=epsg:2454") 
+CRSargs(pj)
+Chuo2<- readShapePoly(shape.file,proj4string = pj)
+
+str(Chuo@data)
+
+```
+
+
+```{r}
+Chuo.dc<- data.frame(MOJI=Chuo@data$MOJI,
+                     X_CODE=Chuo@data$X_CODE,
+                     Y_CODE=Chuo@data$Y_CODE,
+                     KEY_CODE=Chuo@data$KEY_CODE,
+                     JINKO=Chuo@data$JINKO,
+                     SETAI=Chuo@data$SETAI,
+                     X_CEN=coordinates(Chuo)[,1],
+                     Y_CEN=coordinates(Chuo)[,2])
+
+knitr::kable(head(Chuo.dc))
+
+pal <- colorNumeric(
+  palette = "YlOrRd",
+  domain = Chuo.dc$JINKO
+)
+
+leaflet::leaflet(Chuo) %>% 
+  addProviderTiles(provider = "OpenStreetMap.BlackAndWhite") %>% 
+  addPolygons(stroke = FALSE,
+              fillOpacity = 0.9, 
+              color = ~pal(Chuo.dc$JINKO))
+
+leaflet::leaflet(Chuo) %>% 
+  addProviderTiles(provider = "OpenStreetMap.BlackAndWhite") %>% 
+  addPolygons(stroke = FALSE,
+              fillOpacity = 0.9, 
+              color = ~pal(Chuo.dc$JINKO)) %>% 
+  addCircles(lng = coordinates(Chuo)[,1],lat=coordinates(Chuo)[,2],color = "gray80")
+
+```
+
+```{r}
+loca<-loca.p(x=Chuo.dc$X_CEN,y=Chuo.dc$Y_CEN,w=Chuo.dc$JINKO)
+(point<-zsummin(loca))
+x<- as.data.frame(loca@x)
+y<- as.data.frame(loca@y)
+w<- as.data.frame(loca@w)
+knitr::kable(head(data.frame(x=x,y=y,w=w)))
+
+plot(Chuo)
+for(i in 1:nrow(x)){
+  arrows(x[i,],y[i,],point[1],point[2],col="red")
+}
+arrows(x[1,],y[1,],point[1],point[2],col="red",lwd=0.2)
+```
+
+```{r}
+
+#ポリゴンの結合-------------------------
+
+maptools::gpclibPermit()
+
+Chuo.union<- maptools::unionSpatialPolygons(Chuo,IDs=rep(1,times=nrow(Chuo@data)))
+str(Chuo.union)
+
+#描画ワクだけ
+(result<-leaflet::leaflet(Chuo.union) %>% 
+  addProviderTiles(provider = "OpenStreetMap.Mapnik") %>% 
+  addPolygons(stroke = TRUE,color="gray20"))
+
+#-立地分析leaflet--------------------------------------------------
+loca<-loca.p(x=Chuo.dc$X_CEN,y=Chuo.dc$Y_CEN,w=Chuo.dc$JINKO)
+point<-zsummin(loca)
+x<- as.data.frame(loca@x)
+y<- as.data.frame(loca@y)
+w<- as.data.frame(loca@w)
+
+
+resultdata<- data.frame(x=x[1:990,],
+                        y=y[1:990,],
+                        pointx=rep(point[1],990),
+                        pointy=rep(point[2],990))
+
+knitr::kable(tail(resultdata))
+
+test<-result 
+  for(i in 1:nrow(resultdata)){
+    testd<-data.frame(x = as.numeric(resultdata[i, c(1, 3)]),
+                      y = as.numeric(resultdata[i, c(2, 4)]))
+    test <- test %>% addPolylines(data=testd,
+                         lng = ~x, 
+                         lat = ~y,
+                         color="#f30",
+                         weight="2")
+  }
+
+test %>% 
+  setView(lng = point[1], lat = point[2], zoom = 13) %>% 
+  addPopups(lng=point[1],lat=wepoint[2],popup="here!!!")
+```
+
+
+```{r webshot}
+saveWidget(test, "temp.html", selfcontained = FALSE)
+webshot("temp.html", file = "test.png",
+        cliprect = "viewport")
+```
+
