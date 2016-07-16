@@ -1,3 +1,10 @@
+# SappoRoR#6 -ラーメン屋さんになりたい-
+
+@TOC
+
+## データ準備
+
+```r  
     getinfo.shape(shape.file)
 
     ## Shapefile type: Polygon, (5), # of Shapes: 990
@@ -6,7 +13,7 @@
     Chuo<- readShapePoly(shape.file,proj4string = pj)
 
 
-    pj<-CRS("+init=epsg:2454") 
+    pj<-CRS("+init=epsg:2454")
     CRSargs(pj)
 
     ## [1] "+init=epsg:2454 +proj=tmerc +lat_0=44 +lon_0=142.25 +k=0.9999 +x_0=0 +y_0=0 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs"
@@ -66,6 +73,7 @@
                          Y_CEN=coordinates(Chuo)[,2])
 
     knitr::kable(head(Chuo.dc))
+```
 
 <table>
 <thead>
@@ -151,28 +159,40 @@
 </tbody>
 </table>
 
+## 人口コロプレス図で全体を把握
+
+```r
+
     pal <- colorNumeric(
       palette = "YlOrRd",
       domain = Chuo.dc$JINKO
     )
 
-    leaflet::leaflet(Chuo) %>% 
-      addProviderTiles(provider = "OpenStreetMap.BlackAndWhite") %>% 
+    leaflet::leaflet(Chuo) %>%
+      addProviderTiles(provider = "OpenStreetMap.BlackAndWhite") %>%
       addPolygons(stroke = FALSE,
-                  fillOpacity = 0.9, 
+                  fillOpacity = 0.9,
                   color = ~pal(Chuo.dc$JINKO))
+```
 
 ![](SappoRoRNew_files/figure-markdown_strict/unnamed-chunk-3-1.png)
 
-    leaflet::leaflet(Chuo) %>% 
-      addProviderTiles(provider = "OpenStreetMap.BlackAndWhite") %>% 
+## 各ポリゴンの代表点を抽出して「世帯」と見立てる
+
+```r
+    leaflet::leaflet(Chuo) %>%
+      addProviderTiles(provider = "OpenStreetMap.BlackAndWhite") %>%
       addPolygons(stroke = FALSE,
-                  fillOpacity = 0.9, 
-                  color = ~pal(Chuo.dc$JINKO)) %>% 
+                  fillOpacity = 0.9,
+                  color = ~pal(Chuo.dc$JINKO)) %>%
       addCircles(lng = coordinates(Chuo)[,1],lat=coordinates(Chuo)[,2],color = "gray80")
+```
 
 ![](SappoRoRNew_files/figure-markdown_strict/unnamed-chunk-3-2.png)
 
+## 立地分析（Minsum問題）
+
+```r
     loca<-loca.p(x=Chuo.dc$X_CEN,y=Chuo.dc$Y_CEN,w=Chuo.dc$JINKO)
     (point<-zsummin(loca))
 
@@ -182,6 +202,7 @@
     y<- as.data.frame(loca@y)
     w<- as.data.frame(loca@w)
     knitr::kable(head(data.frame(x=x,y=y,w=w)))
+```
 
 <table>
 <thead>
@@ -225,14 +246,20 @@
 </tbody>
 </table>
 
+## 算出されたラーメン屋さんの位置を可視化
+
+```r
     plot(Chuo)
     for(i in 1:nrow(x)){
       arrows(x[i,],y[i,],point[1],point[2],col="red")
     }
     arrows(x[1,],y[1,],point[1],point[2],col="red",lwd=0.2)
+```
 
 ![](SappoRoRNew_files/figure-markdown_strict/unnamed-chunk-4-1.png)
 
+## leafletでも可視化したい
+```r
     #ポリゴンの結合-------------------------
 
     maptools::gpclibPermit()
@@ -268,12 +295,16 @@
     ##   .. .. ..@ projargs: chr "+proj=longlat +datum=WGS84 +ellps=WGS84 +towgs84=0,0,0"
 
     #描画ワクだけ
-    (result<-leaflet::leaflet(Chuo.union) %>% 
-      addProviderTiles(provider = "OpenStreetMap.Mapnik") %>% 
+    (result<-leaflet::leaflet(Chuo.union) %>%
+      addProviderTiles(provider = "OpenStreetMap.Mapnik") %>%
       addPolygons(stroke = TRUE,color="gray20"))
+```
 
 ![](SappoRoRNew_files/figure-markdown_strict/unnamed-chunk-5-1.png)
 
+## 改めて結果を可視化
+
+```r
     #-立地分析leaflet--------------------------------------------------
     loca<-loca.p(x=Chuo.dc$X_CEN,y=Chuo.dc$Y_CEN,w=Chuo.dc$JINKO)
     point<-zsummin(loca)
@@ -288,6 +319,7 @@
                             pointy=rep(point[2],990))
 
     knitr::kable(tail(resultdata))
+```
 
 <table>
 <thead>
@@ -345,23 +377,21 @@
 </tbody>
 </table>
 
-    test<-result 
+```r
+    test<-result
       for(i in 1:nrow(resultdata)){
         testd<-data.frame(x = as.numeric(resultdata[i, c(1, 3)]),
                           y = as.numeric(resultdata[i, c(2, 4)]))
         test <- test %>% addPolylines(data=testd,
-                             lng = ~x, 
+                             lng = ~x,
                              lat = ~y,
                              color="#f30",
                              weight="2")
       }
 
-    test %>% 
-      setView(lng = point[1], lat = point[2], zoom = 13) %>% 
+    test %>%
+      setView(lng = point[1], lat = point[2], zoom = 13) %>%
       addPopups(lng=point[1],lat=point[2],popup="here!!!")
+```
 
 ![](SappoRoRNew_files/figure-markdown_strict/unnamed-chunk-5-2.png)
-
-    #saveWidget(test, "temp.html", selfcontained = FALSE)
-    #webshot("temp.html", file = "test.png",
-    #        cliprect = "viewport")
